@@ -5,9 +5,15 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 class SoundHorizonProcessor:
-    def __init__(self, input_file: str, output_dir: str):
-        self.input_file = Path(input_file)
-        self.output_dir = Path(output_dir)
+    def __init__(self):
+        # Get the current directory (data directory)
+        self.base_dir = Path(os.getcwd())
+        self.input_file = self.base_dir / 'SH Discography.txt'
+        self.output_file = self.base_dir / 'SH JSON processed.json'
+        
+        print(f"Current directory: {self.base_dir}")
+        print(f"Looking for input file at: {self.input_file}")
+        
         self.data = {
             "albums": {},
             "interviews": [],
@@ -21,13 +27,27 @@ class SoundHorizonProcessor:
         try:
             # Check if input file exists
             if not self.input_file.exists():
-                raise FileNotFoundError(f"Input file {self.input_file} not found")
-            
-            # Create output directory if it doesn't exist
-            self.output_dir.mkdir(parents=True, exist_ok=True)
+                # Try alternative names
+                alternatives = [
+                    'SH_Discography.txt',
+                    'SH Discography Lyrics.txt',
+                    'SH_Discography_Lyrics.txt'
+                ]
+                
+                for alt in alternatives:
+                    alt_path = self.base_dir / alt
+                    if alt_path.exists():
+                        self.input_file = alt_path
+                        print(f"Found input file as: {self.input_file}")
+                        break
+                else:
+                    raise FileNotFoundError(
+                        f"Input file not found at: {self.input_file}\n"
+                        f"Current directory contains: {list(self.base_dir.glob('*.txt'))}"
+                    )
             
             # Read input file
-            print(f"Reading file: {self.input_file}")
+            print(f"Reading file from: {self.input_file}")
             with open(self.input_file, 'r', encoding='utf-8') as f:
                 text = f.read()
             
@@ -36,29 +56,29 @@ class SoundHorizonProcessor:
             self._process_text(text)
             
             # Save processed data
-            output_file = self.output_dir / 'sound_horizon_data.json'
-            print(f"Saving to: {output_file}")
-            self._save_json(output_file)
+            print(f"Saving processed data to: {self.output_file}")
+            self._save_json()
             
             print("Processing completed successfully!")
             return True
             
         except Exception as e:
             print(f"Error during processing: {str(e)}")
+            # Print available files in directory
+            print("\nAvailable .txt files in current directory:")
+            for file in self.base_dir.glob('*.txt'):
+                print(f"- {file.name}")
             return False
     
     def _process_text(self, text: str):
-        """Process the text content into structured data"""
         sections = text.split("~~~")
         
         for section in sections:
             if not section.strip():
                 continue
             
-            # Check if section is an album
             if self._is_album_section(section):
                 self._process_album_section(section)
-            # Check if section is an interview
             elif self._is_interview_section(section):
                 self._process_interview_section(section)
             else:
@@ -128,26 +148,19 @@ class SoundHorizonProcessor:
             return date_match.group(0)
         return None
     
-    def _save_json(self, output_file: Path):
+    def _save_json(self):
         """Save processed data to JSON file"""
-        with open(output_file, 'w', encoding='utf-8') as f:
+        with open(self.output_file, 'w', encoding='utf-8') as f:
             json.dump(self.data, f, ensure_ascii=False, indent=2)
 
 def main():
-    # Setup paths
-    script_dir = Path(__file__).parent.resolve()
-    input_file = script_dir / 'data' / 'raw' / 'SH_Discography_Lyrics.txt'
-    output_dir = script_dir / 'data' / 'processed'
-    
-    # Create processor and run
-    processor = SoundHorizonProcessor(input_file, output_dir)
+    processor = SoundHorizonProcessor()
     success = processor.process()
     
     if success:
-        print("\nFile structure:")
-        print(f"Input file: {input_file}")
-        print(f"Output directory: {output_dir}")
-        print(f"Output file: {output_dir / 'sound_horizon_data.json'}")
+        print("\nProcessing completed successfully!")
+        print(f"Input file: {processor.input_file}")
+        print(f"Output file: {processor.output_file}")
     else:
         print("\nProcessing failed. Please check the error messages above.")
 
